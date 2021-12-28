@@ -1,0 +1,10 @@
+﻿{
+	"name": "RoRAdlib",
+	"version_number": "1.0.0",
+	"website_url": "",
+	"description": "Adlib your own names for in game item names",
+	"dependencies": [
+		"bbepis-BepInExPack-5.4.9",
+		"RiskofThunder-HookGenPatcher-1.2.1"
+	]
+}
