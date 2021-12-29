@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 using RoR2;
 using R2API;
@@ -10,26 +9,54 @@ namespace RoRAdlib
 {
     class Data : MonoBehaviour
     {
-        static public List<ItemConfig> allItemConfigs = new List<ItemConfig>();
-        static public List<ItemConfig> allEquipmentConfigs = new List<ItemConfig>();
+        static public Dictionary<DataCategory, List<ConfigEntry<string>>> allData = new();
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Member Access", "Publicizer001:Accessing a member that was not originally public", Justification = "<Pending>")]
         static public void PopulateItemCatalogues(ConfigFile config)
         {
-            Log.LogInfo("Populating Equipment Catalogue");
-            foreach (var equipment in EquipmentCatalog.equipmentDefs)
+            var tokenGroups = new Dictionary<DataCategory, List<string>>();
+            foreach (var item in Language.currentLanguage.stringsByToken)
             {
-                if (equipment.nameToken != null && equipment.nameToken != "")
+                var splitKey = item.Key.Split('_');
+                var section = CastDataCategory(splitKey[0]);
+                var suffix = CastDataSuffix(splitKey[splitKey.Length - 1]);
+
+
+                if (section != DataCategory.Other && suffix != DataSuffix.Other)
                 {
-                    allEquipmentConfigs.Add(new ItemConfig(config, equipment));
+                    if (!tokenGroups.ContainsKey(section))
+                    {
+                        tokenGroups.Add(section, new List<string>());
+                    }
+                    tokenGroups[section].Add(item.Key);
                 }
             }
 
-            Log.LogInfo("Populating Item Catalogue");
-            foreach (var item in ItemCatalog.itemDefs)
+            foreach (var group in tokenGroups)
             {
-                if (item.nameToken != null && item.nameToken != "")
+                group.Value.Sort();
+                allData.Add(group.Key, new List<ConfigEntry<string>>());
+
+                foreach (var key in group.Value)
                 {
-                    allItemConfigs.Add(new ItemConfig(config, item));
+                    var defaultVal = Language.currentLanguage.stringsByToken[key];
+
+                    // Get the root and see if it has a name suffix
+                    // If it does then use that for the section heading instead of category
+                    var root = StripSuffix(key);
+                    var rootWithName = root + "_NAME";
+                    if (Language.currentLanguage.stringsByToken.ContainsKey(rootWithName))
+                    {
+                        var groupRaw = Language.currentLanguage.stringsByToken[rootWithName];
+                        var groupSanitized = group.Key.ToString() + " :: " + SanitizeName(groupRaw);
+
+                        allData[group.Key].Add(config.Bind(groupSanitized, key, defaultVal));
+                    }
+                    else
+                    {
+                        allData[group.Key].Add(config.Bind(group.Key.ToString(), key, defaultVal));
+                    }
+
                 }
             }
         }
@@ -38,18 +65,30 @@ namespace RoRAdlib
         {
             Log.LogInfo("Overriding item names");
 
-            foreach (var equipment in allEquipmentConfigs)
+            foreach (var section in allData)
             {
-                equipment.OverrideNames();
-            }
-
-            foreach (var item in allItemConfigs)
-            {
-                item.OverrideNames();
+                foreach (var itemConfig in section.Value)
+                {
+                    LanguageAPI.Add(itemConfig.Definition.Key, itemConfig.Value);
+                }
             }
         }
 
-        static protected string sanitizeName(string name)
+        static protected string StripSuffix(string name)
+        {
+            foreach (var suffix in Enum.GetValues(typeof(DataSuffix)))
+            {
+                var suffixStr = "_" + suffix.ToString().ToUpper();
+                if (name.Contains(suffixStr))
+                {
+                    return name.Replace(suffixStr, "");
+                }
+            }
+
+            return name;
+        }
+
+        static protected string SanitizeName(string name)
         {
             var sanitized = name.Trim().Replace("'", "");
             if (sanitized.Contains("<"))
@@ -57,62 +96,77 @@ namespace RoRAdlib
                 var start = sanitized.IndexOf(">") + 1;
                 var end = sanitized.IndexOf("<", start);
                 return sanitized.Substring(start, end - start);
-            } else
+            }
+            else
             {
                 return sanitized;
             }
         }
 
-        public class ItemConfig
+        public enum DataCategory
         {
-            public (string, ConfigEntry<string>) nameToken;
-            public (string, ConfigEntry<string>) pickupToken;
-            public (string, ConfigEntry<string>) descToken;
+            Item,
+            Equipment,
+            Shrine,
+            Lunar,
+            Newt,
+            Bazaar,
+            Other
+        }
 
-            public ItemConfig(ConfigFile config, ItemDef item)
+        static protected DataCategory CastDataCategory(string category)
+        {
+            switch (category)
             {
-                string name = Language.GetString(item.nameToken, Language.currentLanguage.name);
-                string section = "Item - " + sanitizeName(name);
-
-                nameToken = (item.nameToken, config.Bind(section, "Name", ""));
-
-                if (item.pickupToken != null)
-                {
-                    pickupToken = (item.pickupToken, config.Bind(section, "Pickup", ""));
-                }
-
-                if (item.descriptionToken != null)
-                {
-                    descToken = (item.descriptionToken, config.Bind(section, "Description", ""));
-                }
-            }
-
-            public ItemConfig(ConfigFile config, EquipmentDef equipment)
-            {
-
-                string name = Language.GetString(equipment.nameToken, Language.currentLanguage.name);
-                string section = "Equipment - " + sanitizeName(name);
-
-                nameToken = (equipment.nameToken, config.Bind(section, "Name", ""));
-
-                if (equipment.pickupToken != null)
-                {
-                    pickupToken = (equipment.pickupToken, config.Bind(section, "Pickup", ""));
-                }
-
-                if (equipment.descriptionToken != null)
-                {
-                    descToken = (equipment.descriptionToken, config.Bind(section, "Description", ""));
-                }
-            }
-
-            public void OverrideNames()
-            {
-                if (nameToken.Item2.Value != "")
-                {
-                    LanguageAPI.Add(nameToken.Item1, nameToken.Item2.Value);
-                }
+                case "ITEM":
+                    return DataCategory.Item;
+                case "EQUIPMENT":
+                    return DataCategory.Equipment;
+                case "SHRINE":
+                    return DataCategory.Shrine;
+                case "LUNAR":
+                    return DataCategory.Lunar;
+                case "NEWT":
+                    return DataCategory.Newt;
+                case "BAZAAR":
+                    return DataCategory.Bazaar;
+                default:
+                    return DataCategory.Other;
             }
         }
+
+        public enum DataSuffix
+        {
+            Name,
+            Pickup,
+            Desc,
+            Lore,
+            Context,
+            Message,
+            Other
+        }
+
+        static protected DataSuffix CastDataSuffix(string suffix)
+        {
+            switch (suffix)
+            {
+                case "NAME":
+                    return DataSuffix.Name;
+                case "PICKUP":
+                    return DataSuffix.Pickup;
+                case "DESC":
+                    return DataSuffix.Desc;
+                case "LORE":
+                    return DataSuffix.Lore;
+                case "CONTEXT":
+                    return DataSuffix.Context;
+                case "MESSAGE":
+                    return DataSuffix.Message;
+                default:
+                    return DataSuffix.Other;
+            }
+        }
+
+
     }
 }

@@ -1,6 +1,6 @@
 ﻿{
 	"name": "RoRAdlib",
-	"version_number": "1.0.0",
+	"version_number": "1.1.0",
 	"website_url": "",
 	"description": "Adlib your own names for in game item names",
 	"dependencies": [
