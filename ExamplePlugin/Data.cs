@@ -111,6 +111,8 @@ namespace RoRAdlib
             Lunar,
             Newt,
             Bazaar,
+            Moon,
+            Portal,
             Other
         }
 
@@ -125,11 +127,16 @@ namespace RoRAdlib
                 case "SHRINE":
                     return DataCategory.Shrine;
                 case "LUNAR":
+                case "PICKUP": // Special case for PICKUP_LUNAR_COIN
                     return DataCategory.Lunar;
                 case "NEWT":
                     return DataCategory.Newt;
                 case "BAZAAR":
                     return DataCategory.Bazaar;
+                case "MOON":
+                    return DataCategory.Moon;
+                case "PORTAL":
+                    return DataCategory.Portal;
                 default:
                     return DataCategory.Other;
             }
@@ -143,6 +150,7 @@ namespace RoRAdlib
             Lore,
             Context,
             Message,
+            Coin,
             Other
         }
 
@@ -162,6 +170,8 @@ namespace RoRAdlib
                     return DataSuffix.Context;
                 case "MESSAGE":
                     return DataSuffix.Message;
+                case "COIN":
+                    return DataSuffix.Coin;
                 default:
                     return DataSuffix.Other;
             }
